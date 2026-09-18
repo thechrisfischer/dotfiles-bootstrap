@@ -63,6 +63,13 @@ _ensure_gh() {
     _install_gh_from_github_release
 }
 
+_bootstrap_gh_use_device_login() {
+    [[ "${DOTFILES_GH_DEVICE_LOGIN:-0}" == 1 ]] && return 0
+    [[ -n "${SSH_CONNECTION:-}" ]] && return 0
+    [[ -z "${DISPLAY:-}" ]] && return 0
+    return 1
+}
+
 _ensure_github_auth() {
     if [[ -n "${GITHUB_TOKEN:-}" ]]; then
         printf '%s\n' "$GITHUB_TOKEN" | gh auth login -h github.com --with-token
@@ -77,8 +84,14 @@ _ensure_github_auth() {
         return 0
     fi
 
-    echo "→ GitHub login (browser — username/password or SSO; no PAT required)"
-    gh auth login -h github.com -p https -w
+    if _bootstrap_gh_use_device_login; then
+        echo "→ GitHub device login (SSH/remote — use your laptop browser, not this host)"
+        echo "   Open https://github.com/login/device and enter the one-time code gh prints."
+        gh auth login -h github.com -p https --web=false --skip-ssh-key
+    else
+        echo "→ GitHub login (local browser — username/password or SSO)"
+        gh auth login -h github.com -p https -w --skip-ssh-key
+    fi
     gh auth setup-git
     echo "✅ GitHub authenticated"
 }
